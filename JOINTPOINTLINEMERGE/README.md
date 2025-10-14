@@ -5,6 +5,7 @@ A Python tool for merging lines at joint points using geospatial operations.
 ## Description
 
 JointPoint LineMerge is a geospatial processing tool that merges line segments at specified joint points. It uses advanced geometric operations to combine connected line segments while maintaining spatial accuracy and handling various edge cases.
+
 The optimal tool for solving problems such as... : https://gis.stackexchange.com/questions/194486/arcgis-10-3-how-to-merge-lines-divided-by-junction-points
 
 ## Features
