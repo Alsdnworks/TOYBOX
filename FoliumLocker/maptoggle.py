@@ -1,109 +1,84 @@
 from IPython.display import display, HTML
+import uuid
+import html
 
-# TODO: fig 구분해서 선택 가능한 LOCK을 지원 하도록개선
 
+def enable_map_toggle(
+    fig,
+    lock=True,
+    fig_id=None,
+):
 
-def enable_map_toggle(fig):
-    display(fig)
+    if fig_id is None:
+        fig_id = f"{fig.get_name()}"
+
+    wrap_id = f"folium-wrap-{uuid.uuid4().hex}"
+    iframe_html = fig._repr_html_()
+
     display(
         HTML(
-            r"""
+            f"""
+<div id="{wrap_id}" class="folium-wrap" data-fig-id="{html.escape(fig_id)}" style="position:relative;width:100%;">
+  {iframe_html}
+  <div class="folium-overlay"
+       style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;
+              background:rgba(0,0,0,0.4);color:#fff;font:14px/1.4 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+              letter-spacing:.2px;text-align:center;padding:12px;user-select:none;pointer-events:none;transition:opacity .15s ease;
+              font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.6);z-index:1000;">
+        "Press Ctrl/⌘ to toggle"
+  </div>
+</div>
 <script>
-(function(){
-  function init(){
-    const iframes = Array.from(document.querySelectorAll('iframe'));
-    if (!iframes.length) return;
-    let ifr = null;
-    for (let i = iframes.length; i >= 0; i--) {
-      const el = iframes[i];
-      try {
-        const doc = el.contentDocument;
-        if (doc && (doc.documentElement.innerHTML || '').toLowerCase().includes('leaflet')) {
-          ifr = el; break;
-        }
-      } catch(_) {}
-    }
-    // TODO: iframe못잡을때 망가지는 문제 수정
-    if (!ifr) ifr = iframes[iframes.length];
-    if (!ifr) return;
+(function(){{
+  const wrap = document.getElementById({wrap_id!r});
+  if (!wrap) return;
+  const ifr = wrap.querySelector('iframe');
+  const ovl = wrap.querySelector('.folium-overlay');
+  if (!ifr || !ovl) return;
 
-    if (ifr.parentElement && ifr.parentElement.classList.contains('folium-wrap')) return;
+  let active = {'false' if lock else 'true'};
+  function setActive(b){{
+    active = b;
+    ifr.style.pointerEvents = b ? 'auto' : 'none';
+    ovl.style.opacity = b ? '0' : '1';
+  }}
+  setActive(false);
 
-    const wrap = document.createElement('div');
-    wrap.className = 'folium-wrap';
-    wrap.style.position = 'relative';
-    wrap.style.width = '100%';
-    const parent = ifr.parentElement;
-    parent.insertBefore(wrap, ifr);
-    wrap.appendChild(ifr);
+  wrap.tabIndex = 0;
+  wrap.addEventListener('mouseenter', () => wrap.focus({{preventScroll:true}}));
+  wrap.addEventListener('mouseleave', () => setActive(false));
+  wrap.addEventListener('keydown', (e) => {{
+    if (e.ctrlKey || e.metaKey) {{
+      e.preventDefault();
+      setActive(!active);
+    }}
+  }});
 
-    const ovl = document.createElement('div');
-    ovl.className = 'folium-overlay';
-    Object.assign(ovl.style, {
-      position: 'absolute', inset: '0',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'rgba(0,0,0,0.4)', color: '#fff',
-      font: '14px/1.4 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif',
-      letterSpacing: '.2px', textAlign: 'center', padding: '12px',
-      userSelect: 'none', pointerEvents: 'none', transition: 'opacity .15s ease',
-      fontWeight: '700',
-      textShadow: '0 1px 2px rgba(0,0,0,.6)'
-    });
-    ovl.textContent = 'Press Ctrl/⌘ to toggle';
-    wrap.appendChild(ovl);
-
-    let active = false;
-    function setActive(b){
-      active = b;
-      ifr.style.pointerEvents = b ? 'auto' : 'none';
-      ovl.style.opacity = b ? '0' : '1';
-    }
-    setActive(false);
-
-    wrap.tabIndex = 0;
-    wrap.addEventListener('mouseenter', () => wrap.focus({preventScroll:true}));
-    wrap.addEventListener('mouseleave', () => { setActive(false); });
-
-    // add 
-    wrap.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.repeat) {
-        e.preventDefault();
-        setActive(!active);
-      }
-    });
-
-    // attach iframe keys to prevent propagation to leaflwt
-    function attachIframeKey(){
-      try{
-        const idoc = ifr.contentDocument;
-        const win  = ifr.contentWindow;
-        if (!idoc || !win) return;
-        const handler = (e) => {
-          if ((e.ctrlKey || e.metaKey) && e.repeat) {
-            e.preventDefault();
-            if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-            e.stopPropagation();
-            setActive(!active);
-          }
-        };
-        idoc.addEventListener('keydown', handler, {capture:true});
-        idoc.addEventListener('keyup',   handler, {capture:true});
-        win .addEventListener('keydown', handler, {capture:true});
-        win .addEventListener('keyup',   handler, {capture:true});
-      }catch(_){}
-    }
-    if (ifr.contentDocument) attachIframeKey();
-    else ifr.addEventListener('load', attachIframeKey);
-  }
-
-  // DOMContentLoaded timing correction with folium iframe
-  if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(init, 0);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(init, 0), {once:true});
-  }
-})();
+  function attachIframeKey(){{
+    try {{
+      const idoc = ifr.contentDocument;
+      const win  = ifr.contentWindow;
+      if (!idoc || !win) return;
+      const handler = (e) => {{
+        if (e.ctrlKey || e.metaKey) {{
+          e.preventDefault();
+          if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+          e.stopPropagation();
+          setActive(!active);
+        }}
+      }};
+      idoc.addEventListener('keydown', handler, {{capture:true}});
+      idoc.addEventListener('keyup',   handler, {{capture:true}});
+      win .addEventListener('keydown', handler, {{capture:true}});
+      win .addEventListener('keyup',   handler, {{capture:true}});
+    }} catch (_){{
+      /* no-op */
+    }}
+  }}
+  if (ifr.contentDocument) attachIframeKey();
+  else ifr.addEventListener('load', attachIframeKey);
+}})();
 </script>
-"""
+    """
         )
     )
