@@ -108,7 +108,39 @@ def merge_two_lines(l1: LineString, l2: LineString, snap_tol: float) -> LineStri
         m = linemerge(unary_union(m))
     # raise error if not LineString NOTE: 이런경우는 직접 데이터를 봐야하므로 무리하게 처리하지 않음
     if m.geom_type != "LineString":
-        raise ValueError("LineString Conversion Failed in merge_two_lines() check geometry validity.")
+        # find Commonality of two lines and connect coordinates manually
+        l1_start, l1_end = Point(list(l1.coords)[0]), Point(list(l1.coords)[-1])
+        l2_start, l2_end = Point(list(l2.coords)[0]), Point(list(l2.coords)[-1])
+        common_pts = None
+        for p1 in [l1_start, l1_end]:
+            for p2 in [l2_start, l2_end]:
+                if p1.equals(p2):
+                    common_pts = p1
+        if common_pts is None:
+            for p1 in [l1_start, l1_end]:
+                for p2 in [l2_start, l2_end]:
+                    # check intersection within snap_tol
+                    if p1.distance(p2) <= snap_tol:
+                        common_pts = p1
+        if common_pts is None:
+            raise ValueError("Merged geometry is not LineString.")
+
+        if common_pts.equals(l1_start):
+            l1_coords = list(l1.coords)[::-1]
+        else:
+            l1_coords = list(l1.coords)
+        if common_pts.equals(l2_start):
+            l2_coords = list(l2.coords)[1:]
+        else:
+            l2_coords = list(l2.coords)[::-1][1:]
+        try:
+            merged_coords = l1_coords + l2_coords
+            m = LineString(merged_coords)
+            if m.geom_type != "LineString":
+                raise ValueError("Merged geometry is not LineString.")
+        except Exception as e:
+            raise ValueError(f"Error in manual merging: {e}")
+
     return m
 
 
